@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>22&22 S.A.S. | ERP CORPORATE FINAL V10.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com" rel="stylesheet">
+    <style>
+        :root { --neon: #00ff41; --bg: #050505; }
+        body { font-family: 'JetBrains Mono', monospace; background: var(--bg); color: var(--neon); }
+        .terminal-border { border: 1px solid #003b00; background: rgba(0,0,0,0.8); }
+        .input-retro { background: transparent; border: 1px solid #003b00; color: white; padding: 8px; width: 100%; outline: none; font-size: 12px; }
+        .input-retro:focus { border-color: var(--neon); box-shadow: 0 0 10px var(--neon); }
+        .sidebar-btn { width: 100%; text-align: left; padding: 14px 20px; border-left: 4px solid transparent; transition: 0.3s; font-size: 11px; }
+        .sidebar-btn.active { background: #001a00; border-left-color: var(--neon); color: white; }
+        .label-min { font-size: 9px; text-transform: uppercase; opacity: 0.6; margin-bottom: 2px; display: block; }
+        
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; background: white !important; color: black !important; width: 100%; }
+            .ticket-font { font-family: 'VT323', monospace; font-size: 18px; }
+            .receipt-page { min-height: 100vh; padding: 40px; border-bottom: 3px dashed #000; page-break-after: always; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; border: 1px solid black; }
+            th, td { border: 1px solid black; padding: 10px; text-align: left; }
+            .divider { border-top: 2px dashed black; margin: 15px 0; }
+        }
+        .hidden { display: none; }
+    </style>
+</head>
+<body class="flex">
+
+    <!-- NAVEGACIÓN -->
+    <nav class="w-64 bg-black border-r border-zinc-900 h-screen fixed no-print z-20">
+        <div class="p-6 border-b border-zinc-900 text-center">
+            <h1 class="text-xl font-bold tracking-tighter italic">22&22 S.A.S.</h1>
+            <p id="clock" class="text-[9px] opacity-60 mt-1 uppercase tracking-widest"></p>
+        </div>
+        <div class="mt-4">
+            <button onclick="showTab('caja')" id="btn-caja" class="sidebar-btn active">> CAJA_TERMINAL</button>
+            <button onclick="showTab('empleados')" id="btn-empleados" class="sidebar-btn">> RRHH_PERSONAL</button>
+            <button onclick="showTab('profesionales')" id="btn-profesionales" class="sidebar-btn">> STAFF_PRO</button>
+            <button onclick="showTab('repartidores')" id="btn-repartidores" class="sidebar-btn">> REPARTIDORES_ARCA</button>
+            <button onclick="showTab('proveedores')" id="btn-proveedores" class="sidebar-btn">> PROVEEDORES_IMP</button>
+            <button onclick="showTab('egresos')" id="btn-egresos" class="sidebar-btn">> EGRESOS_SISTEMA</button>
+        </div>
+        <div class="absolute bottom-5 w-full px-4 text-center">
+            <div id="display-caja" class="text-2xl font-bold text-white mb-4">$0</div>
+            <button onclick="cerrarCaja()" class="w-full border-2 border-red-600 text-red-500 py-3 text-[10px] font-black uppercase hover:bg-red-600 hover:text-white transition-all">Ejecutar Cierre</button>
+        </div>
+    </nav>
+
+    <!-- ÁREA DE TRABAJO -->
+    <main class="ml-64 flex-1 p-8 no-print overflow-y-auto h-screen">
+
+        <!-- MÓDULO CAJA -->
+        <section id="tab-caja" class="tab-content">
+            <h2 class="text-2xl font-bold mb-6 text-white uppercase tracking-tighter">> Terminal_Ventas</h2>
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div class="xl:col-span-2 terminal-border p-6">
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div><label class="label-min">Repartidor ARCA</label><select id="v_repartidor" class="input-retro"></select></div>
+                        <div><label class="label-min">Razón Social Cliente</label><input type="text" id="v_cliente" class="input-retro"></div>
+                    </div>
+                    <div class="flex gap-4 mb-6">
+                        <select id="v_item" class="input-retro flex-1">
+                            <option value="1270" data-n="Bidón 20 Litros">Bidón 20L ($1270)</option>
+                            <option value="1270" data-n="Bidón 20 Litros">Bidón 12L ($1270)</option>
+                            <option value="1250" data-n="Cajón de Soda">Cajón Soda ($1250)</option>
+                            <option value="1270" data-n="Bidón 20 Litros">Bidón 6L ($0)</option>
+                            <option value="1270" data-n="Bidón 20 Litros">Botella 500CC ($0)</option>
+                        </select>
+                        <input type="number" id="v_cant" value="1" min="1" class="input-retro w-20 text-center">
+                        <button onclick="addCarga()" class="bg-green-600 text-black px-8 font-bold hover:bg-white">+</button>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4 mb-6">
+                        <div><label class="label-min">Efectivo $</label><input type="number" id="p_ef" oninput="validarVenta()" class="input-retro"></div>
+                        <div><label class="label-min">Transf. $</label><input type="number" id="p_tr" oninput="validarVenta()" class="input-retro"></div>
+                        <div><label class="label-min">Cheque $</label><input type="number" id="p_ch" oninput="validarVenta()" class="input-retro"></div>
+                    </div>
+                    <div class="bg-zinc-900 p-6 flex justify-between border-l-4 border-green-500">
+                        <div><p class="label-min">TOTAL VENTA</p><span id="v_total_num" class="text-4xl font-bold text-white">$0</span></div>
+                        <div class="text-right"><p class="label-min">DIFERENCIA</p><span id="v_resta_num" class="text-2xl font-bold text-red-500">$0</span></div>
+                    </div>
+                    <button id="btn_liquidar" onclick="liquidarVenta()" disabled class="w-full bg-zinc-800 p-4 mt-4 font-black uppercase opacity-20">Procesar Ticket Fiscal</button>
+                </div>
+                <div class="terminal-border p-4 h-fit"><h3 class="label-min mb-4">Carga en Planilla</h3><div id="lista_carga" class="space-y-2 text-[11px]"></div></div>
+            </div>
+        </section>
+
+        <!-- MÓDULO STAFF PROFESIONAL -->
+        <section id="tab-profesionales" class="tab-content hidden">
+            <h2 class="text-2xl font-bold mb-6 text-white uppercase tracking-tighter">> Staff_Profesional_Asesores</h2>
+            <div class="terminal-border p-8 max-w-4xl">
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <input type="text" id="pr_nom" placeholder="Nombre y Apellido" class="input-retro">
+                    <input type="text" id="pr_ocu" placeholder="Ocupación (Contador/Técnico)" class="input-retro">
+                </div>
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <input type="text" id="pr_sec" placeholder="Sector" class="input-retro">
+                    <input type="text" id="pr_tel" placeholder="Teléfono" class="input-retro">
+                    <input type="number" id="pr_mon" placeholder="Honorarios $" class="input-retro">
+                </div>
+                <button onclick="saveProfesional()" class="w-full bg-green-700 text-white font-black p-3">ALTA PROFESIONAL</button>
+            </div>
+            <div id="lista_profesionales" class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </section>
+
+        <!-- RRHH PERSONAL -->
+        <section id="tab-empleados" class="tab-content hidden">
+            <h2 class="text-2xl font-bold mb-6 text-white uppercase tracking-tighter">> RRHH_Legajos</h2>
+            <div class="terminal-border p-6 mb-8">
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                    <input type="text" id="e_nom" placeholder="Nombre" class="input-retro">
+                    <input type="text" id="e_dni" placeholder="DNI" class="input-retro">
+                    <select id="e_arca" class="input-retro">
+                        <option value="Dependencia">Relación de Dependencia</option>
+                        <option value="Monotributo">Monotributista</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <input type="text" id="e_dir" placeholder="Dirección" class="input-retro">
+                    <input type="text" id="e_tel" placeholder="Teléfono" class="input-retro">
+                    <input type="number" id="e_sal" placeholder="Sueldo $" class="input-retro">
+                </div>
+                <button onclick="saveEmpleado()" class="w-full bg-white text-black font-bold p-3">GRABAR</button>
+            </div>
+            <div id="lista_empleados" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-[10px]"></div>
+        </section>
+
+        <!-- REPARTIDORES -->
+        <section id="tab-repartidores" class="tab-content hidden">
+            <h2 class="text-2xl font-bold mb-6 text-white uppercase tracking-tighter">> Logística_Vendedores</h2>
+            <div class="terminal-border p-6 max-w-xl">
+                <input type="text" id="r_nom" placeholder="Nombre" class="input-retro mb-2">
+                <input type="text" id="r_cuit" placeholder="CUIT" class="input-retro mb-4">
+                <select id="e_arca" class="input-retro">
+                        <option value="Dependencia">Responsable Inscripto</option>
+                        <option value="Monotributo">Monotributista</option>
+                    </select>
+                <button onclick="saveRepartidor()" class="w-full bg-green-700 text-white p-2">VINCULAR</button>
+            </div>
+            <div id="lista_repartidores" class="mt-4 space-y-2"></div>
+        </section>
+
+        <!-- PROVEEDORES -->
+        <section id="tab-proveedores" class="tab-content hidden">
+            <h2 class="text-2xl font-bold mb-6 text-white uppercase">> Proveedores_Vencimientos</h2>
+            <div class="grid grid-cols-2 gap-6">
+                <div class="terminal-border p-6"><input type="text" id="p_nom" placeholder="Empresa" class="input-retro mb-2"><input type="date" id="p_venc" class="input-retro mb-4"><button onclick="saveProveedor()" class="w-full bg-blue-700 text-white p-2">REGISTRAR</button></div>
+                <div id="lista_proveedores" class="space-y-2"></div>
+            </div>
+        </section>
+
+        <!-- EGRESOS -->
+        <section id="tab-egresos" class="tab-content hidden">
+            <h2 class="text-2xl font-bold mb-6 text-white uppercase">> Auditoría_Egresos</h2>
+            <div class="grid grid-cols-2 gap-8">
+                <div class="terminal-border p-6"><h3 class="label-min mb-4 text-white">Nómina de Pagos</h3><div id="nomina_pagos" class="space-y-4"></div></div>
+                <div class="terminal-border p-6"><h3 class="label-min mb-4 text-white">Gastos Varios</h3><input type="text" id="g_con" placeholder="Concepto" class="input-retro mb-2"><input type="number" id="g_mon" placeholder="Monto $" class="input-retro mb-4"><button onclick="saveGasto()" class="w-full bg-red-900 text-white p-2">EFECTUAR PAGO</button></div>
+            </div>
+        </section>
+    </main>
+
+    <div id="print-area" class="print-only hidden"></div>
+
+    <script>
+        let db = JSON.parse(localStorage.getItem('2222_master_v10')) || {
+            empleados: [], profesionales: [], repartidores: [], proveedores: [], gastos: [], ventas_dia: [], caja_total: 0
+        };
+        let carga_actual = [];
+        const EMP_HEADER = `<div style="text-align:center; border-bottom:3px solid #000; padding-bottom:20px; margin-bottom:30px" class="ticket-font">
+            <h1 style="margin:0; font-size:40px">22&22 S.A.S.</h1>
+            <p style="font-size:18px">SEVERO DEL CASTILLO 3860, FRACCION B, LOS CORRALITOS, GUAYMALLEN, MENDOZA</p>
+            <p style="font-size:18px">CUIT: 30-XXXXXXXX-X | TEL: 2615336149</p>
+        </div>`;
+
+        function save() { localStorage.setItem('2222_master_v10', JSON.stringify(db)); render(); }
+
+        function showTab(id) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-'+id).classList.remove('hidden');
+            document.getElementById('btn-'+id).classList.add('active');
+        }
+
+        // --- MOTOR DE CAJA ---
+        function addCarga() {
+            const s = document.getElementById('v_item');
+            carga_actual.push({ nombre: s.options[s.selectedIndex].dataset.n, precio: parseFloat(s.value), cant: parseInt(document.getElementById('v_cant').value) });
+            renderVenta();
+        }
+        function renderVenta() {
+            const list = document.getElementById('lista_carga');
+            const total = carga_actual.reduce((a, b) => a + (b.precio * b.cant), 0);
+            list.innerHTML = carga_actual.map(i => `<div class="bg-zinc-900 p-2 border-l border-green-500">${i.nombre} x${i.cant} - $${i.precio*i.cant}</div>`).join('');
+            document.getElementById('v_total_num').innerText = '$' + total.toLocaleString();
+            validarVenta();
+        }
+        function validarVenta() {
+            const total = carga_actual.reduce((a, b) => a + (b.precio * b.cant), 0);
+            const pagado = (parseFloat(document.getElementById('p_ef').value)||0) + (parseFloat(document.getElementById('p_tr').value)||0) + (parseFloat(document.getElementById('p_ch').value)||0);
+            document.getElementById('v_resta_num').innerText = '$' + (total-pagado > 0 ? (total-pagado).toLocaleString() : 0);
+            document.getElementById('btn_liquidar').disabled = !(total > 0 && pagado >= total);
+            document.getElementById('btn_liquidar').style.opacity = (total > 0 && pagado >= total) ? 1 : 0.2;
+        }
+
+        function liquidarVenta() {
+            const cli = document.getElementById('v_cliente').value || "CONSUMIDOR FINAL";
+            const rep = db.repartidores.find(r => r.nombre === document.getElementById('v_repartidor').value);
+            const total = carga_actual.reduce((a, b) => a + (b.precio * b.cant), 0);
+            const fecha = new Date().toLocaleString();
+
+            const p = document.getElementById('print-area');
+            const html = (t) => `
+                <div class="receipt-page ticket-font">
+                    ${EMP_HEADER}
+                    <h2 align="center">${t}</h2>
+                    <div class="divider"></div>
+                    <p><strong>FECHA:</strong> ${fecha}</p>
+                    <p><strong>CLIENTE:</strong> ${cli}</p>
+                    <p><strong>REPARTIDOR:</strong> ${rep.nombre} (${rep.cuit})</p>
+                    <table>
+                        <thead><tr><th>DESC.</th><th>CANT</th><th>UNIT</th><th>TOTAL</th></tr></thead>
+                        <tbody>${carga_actual.map(i=>`<tr><td>${i.nombre}</td><td>${i.cant}</td><td>$${i.precio}</td><td>$${i.precio*i.cant}</td></tr>`).join('')}</tbody>
+                    </table>
+                    <div class="divider"></div>
+                    <h1 align="right">TOTAL: $${total.toLocaleString()}</h1>
+                    <div style="margin-top:60px; display:flex; justify-content:space-around">
+                        <div style="border-top:2px solid black; width:40%; text-align:center">REPARTIDOR</div>
+                        <div style="border-top:2px solid black; width:40%; text-align:center">CLIENTE</div>
+                    </div>
+                </div>`;
+            p.innerHTML = html("ORIGINAL CLIENTE") + html("DUPLICADO EMPRESA");
+            window.print();
+
+            db.ventas_dia.push({ cliente: cli, items: [...carga_actual], total, repartidor: rep.nombre });
+            db.caja_total += parseFloat(document.getElementById('p_ef').value) || 0;
+            carga_actual = [];
+            ['v_cliente','p_ef','p_tr','p_ch'].forEach(id => document.getElementById(id).value = '');
+            save(); renderVenta();
+        }
+
+        // --- STAFF PROFESIONAL ---
+        function saveProfesional() {
+            db.profesionales.push({ id: Date.now(), nombre: document.getElementById('pr_nom').value, ocupacion: document.getElementById('pr_ocu').value, sector: document.getElementById('pr_sec').value, tel: document.getElementById('pr_tel').value, monto: parseFloat(document.getElementById('pr_mon').value) });
+            save();
+            ['pr_nom','pr_ocu','pr_sec','pr_tel','pr_mon'].forEach(id => document.getElementById(id).value = '');
+        }
+
+        // --- CIERRE DE CAJA ---
+        function cerrarCaja() {
+            const ingBruto = db.ventas_dia.reduce((a,b)=>a+b.total, 0);
+            const egrTotal = db.gastos.reduce((a,b)=>a+b.mon, 0);
+            const balance = ingBruto - egrTotal;
+            
+            const rankRep = {}; const rankProd = {};
+            db.ventas_dia.forEach(v => {
+                rankRep[v.repartidor] = (rankRep[v.repartidor]||0) + v.total;
+                v.items.forEach(i => rankProd[i.nombre] = (rankProd[i.nombre]||0) + i.cant);
+            });
+            const topRep = Object.entries(rankRep).sort((a,b)=>b-a)[0] || ["N/A", 0];
+            const topProd = Object.entries(rankProd).sort((a,b)=>b-a)[0] || ["N/A", 0];
+
+            const p = document.getElementById('print-area');
+            p.innerHTML = `
+                <div class="receipt-page ticket-font">
+                    ${EMP_HEADER}
+                    <h1 align="center">BALANCE ANALÍTICO DE CIERRE</h1>
+                    <div class="divider"></div>
+                    
+                    <div style="display:flex; justify-content:space-between">
+                        <div style="width:48%">
+                            <h2 style="text-decoration:underline">INGRESOS (DETALLE)</h2>
+                            ${db.ventas_dia.map(v => `<p style="font-size:14px">${v.cliente}: $${v.total.toLocaleString()}</p>`).join('')}
+                            <p><strong>TOTAL INGRESOS: $${ingBruto.toLocaleString()}</strong></p>
+                        </div>
+                        <div style="width:48%; text-align:right">
+                            <h2 style="text-decoration:underline">EGRESOS (DETALLE)</h2>
+                            ${db.gastos.map(g => `<p style="font-size:14px">${g.con}: -$${g.mon.toLocaleString()}</p>`).join('')}
+                            <p><strong>TOTAL EGRESOS: $${egrTotal.toLocaleString()}</strong></p>
+                        </div>
+                    </div>
+                    
+                    <div class="divider"></div>
+                    <h1 align="center" style="font-size:40px">BALANCE NETO: $${balance.toLocaleString()}</h1>
+                    <div class="divider"></div>
+                    
+                    <h2>MÉTRICAS DE RENDIMIENTO</h2>
+                    <p><strong>VENDEDOR ESTRELLA:</strong> ${topRep[0]} (Recaudó: $${topRep[1]})</p>
+                    <p><strong>PRODUCTO LÍDER:</strong> ${topProd[0]} (${topProd[1]} unidades)</p>
+                    
+                    <div class="divider"></div>
+                    <h2>ANÁLISIS FINANCIERO</h2>
+                    <p>ESTADO: ${balance > 0 ? "RESULTADO RENTABLE" : "RESULTADO DEFICITARIO"}</p>
+                    <p>ANÁLISIS: ${balance > 0 ? "El flujo es positivo. Mantener la estrategia de ventas actual." : "Los gastos operativos superan la entrada. Se sugiere recortar gastos fijos o subir cuotas de reparto."}</p>
+                </div>`;
+            window.print();
+            db.ventas_dia = []; db.gastos = []; db.caja_total = 0;
+            save();
+        }
+
+        // --- CRUD BÁSICO ---
+        function saveEmpleado() {
+            db.empleados.push({ id: Date.now(), nombre: document.getElementById('e_nom').value, dni: document.getElementById('e_dni').value, arca: document.getElementById('e_arca').value, sueldo: parseFloat(document.getElementById('e_sal').value), dir: document.getElementById('e_dir').value, tel: document.getElementById('e_tel').value });
+            save();
+            ['e_nom','e_dni','e_sal','e_dir','e_tel'].forEach(id => document.getElementById(id).value = '');
+        }
+
+        function darBajaEmpleado(id) {
+            const emp = db.empleados.find(e => e.id === id);
+            const motivo = prompt(`Ingrese el motivo de la baja para ${emp.nombre}:`);
+            if (motivo === null) return;
+            const liquidacion = parseFloat(prompt(`Ingrese el monto de la Liquidación Final para ${emp.nombre}:`)) || 0;
+
+            const p = document.getElementById('print-area');
+            const html = (t) => `
+                <div class="receipt-page ticket-font">
+                    ${EMP_HEADER}
+                    <h2 align="center">NOTIFICACIÓN DE BAJA LABORAL (${t})</h2>
+                    <div class="divider"></div>
+                    <p><strong>EMPLEADO:</strong> ${emp.nombre}</p>
+                    <p><strong>DNI:</strong> ${emp.dni}</p>
+                    <p><strong>FECHA:</strong> ${new Date().toLocaleDateString()}</p>
+                    <p><strong>MOTIVO DE BAJA:</strong> ${motivo}</p>
+                    <div class="divider"></div>
+                    <h1 align="center">LIQUIDACIÓN FINAL: $${liquidacion.toLocaleString()}</h1>
+                    <div class="divider"></div>
+                    <div style="margin-top:80px; display:flex; justify-content:space-around">
+                        <div style="border-top:2px solid black; width:40%; text-align:center">FIRMA EMPLEADOR</div>
+                        <div style="border-top:2px solid black; width:40%; text-align:center">FIRMA EMPLEADO</div>
+                    </div>
+                </div>`;
+            
+            p.innerHTML = html("ORIGINAL") + html("DUPLICADO");
+            window.print();
+
+            db.gastos.push({ con: `LIQ. FINAL: ${emp.nombre}`, mon: liquidacion });
+            db.caja_total -= liquidacion;
+            db.empleados = db.empleados.filter(e => e.id !== id);
+            save();
+        }
+
+        function saveRepartidor() { db.repartidores.push({ nombre: document.getElementById('r_nom').value, cuit: document.getElementById('r_cuit').value }); save(); document.getElementById('r_nom').value=''; document.getElementById('r_cuit').value=''; }
+        function saveProveedor() { db.proveedores.push({ nom: document.getElementById('p_nom').value, venc: document.getElementById('p_venc').value }); save(); }
+        function saveGasto() { const m = parseFloat(document.getElementById('g_mon').value); db.gastos.push({ con: document.getElementById('g_con').value, mon: m }); db.caja_total -= m; save(); }
+
+        function pagarSujeto(id, tipo) {
+            const lista = tipo === 'emp' ? db.empleados : db.profesionales;
+            const s = lista.find(x => x.id === id);
+            const monto = tipo === 'emp' ? s.sueldo / 4 : s.monto;
+            db.caja_total -= monto;
+            db.gastos.push({ con: `PAGO: ${s.nombre}`, mon: monto });
+            const p = document.getElementById('print-area');
+            p.innerHTML = `<div class="receipt-page ticket-font">${EMP_HEADER}<h2 align="center">COMPROBANTE DE PAGO</h2><p><strong>BENEFICIARIO:</strong> ${s.nombre}</p><p><strong>CONCEPTO:</strong> LIQUIDACIÓN ${tipo==='emp'?'SEMANAL':'HONORARIOS'}</p><h1 align="center">$${monto.toLocaleString()}</h1><div style="margin-top:50px; border-top:2px solid black; text-align:center">FIRMA RECEPTOR</div></div>`;
+            window.print();
+            save();
+        }
+
+        function render() {
+            document.getElementById('display-caja').innerText = '$' + db.caja_total.toLocaleString();
+            document.getElementById('v_repartidor').innerHTML = db.repartidores.map(r => `<option value="${r.nombre}">${r.nombre}</option>`).join('');
+            
+            document.getElementById('lista_profesionales').innerHTML = db.profesionales.map(p => `
+                <div class="terminal-border p-4 flex justify-between items-center">
+                    <div><p class="font-bold text-white uppercase">${p.nombre}</p><p class="text-[10px] opacity-60">${p.ocupacion} | ${p.sector}</p><p class="text-white font-bold">$${p.monto.toLocaleString()}</p></div>
+                    <button onclick="db.profesionales=db.profesionales.filter(x=>x.id!==${p.id});save()" class="text-red-500 text-[10px]">X</button>
+                </div>`).join('');
+
+            document.getElementById('lista_empleados').innerHTML = db.empleados.map(e => `<div class="bg-zinc-900 p-2 flex justify-between text-[10px] mb-1"><span>${e.nombre} (${e.dni})</span><button onclick="darBajaEmpleado(${e.id})" class="text-red-500 font-bold">DAR BAJA</button></div>`).join('');
+            document.getElementById('lista_repartidores').innerHTML = db.repartidores.map((r,i) => `<div class="bg-zinc-900 p-2 text-xs mb-1 flex justify-between"><span>${r.nombre}</span><button onclick="db.repartidores.splice(${i},1);save()" class="text-red-500">X</button></div>`).join('');
+            document.getElementById('nomina_pagos').innerHTML = `
+                ${db.empleados.map(e => `<div class="flex justify-between text-xs bg-zinc-900 p-2 mb-1"><span>${e.nombre} (Op)</span><button onclick="pagarSujeto(${e.id},'emp')" class="bg-red-800 px-2 font-bold">LIQ $${(e.sueldo/4).toLocaleString()}</button></div>`).join('')}
+                ${db.profesionales.map(p => `<div class="flex justify-between text-xs bg-indigo-900/40 p-2 mb-1"><span>${p.nombre} (Staff)</span><button onclick="pagarSujeto(${p.id},'pro')" class="bg-indigo-700 px-2 font-bold">PAGAR $${p.monto.toLocaleString()}</button></div>`).join('')}
+            `;
+            document.getElementById('lista_proveedores').innerHTML = db.proveedores.map(p => `<div class="bg-zinc-900 p-2 border-l border-blue-500 text-xs">${p.nom} - Venc: ${p.venc}</div>`).join('');
+        }
+
+        setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
+        render();
+    </script>
+</body>
+</html>
